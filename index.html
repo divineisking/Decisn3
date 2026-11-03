@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decisn3 — Project Decision Archaeology & Interactive Decision Graph</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕸️</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Local Three.js & OrbitControls for offline 3D Decision Graph -->
+  <script src="libs/three.min.js"></script>
+  <script src="libs/OrbitControls.js"></script>
+  <!-- Embedded data fallback for zero-server file:// browsing -->
+  <script src="data/data.js"></script>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <div class="brand-badge">Decisn3</div>
+      <div class="brand-title">Decision Archaeology</div>
+      <div class="brand-subtitle">Interactive Decision Graph</div>
+    </div>
+
+    <div class="nav-controls">
+      <div class="tab-group">
+        <button class="tab-btn active" data-tab="graph">🕸️ Decision Graph</button>
+        <button class="tab-btn" data-tab="timeline">⏱️ Timeline</button>
+        <button class="tab-btn" data-tab="explorer">🔍 Explorer</button>
+        <button class="tab-btn" data-tab="sources">📚 Sources</button>
+      </div>
+
+      <button class="theme-toggle-btn" id="theme-toggle">☀️ Light</button>
+    </div>
+  </header>
+
+  <!-- Overview Summary Metrics Bar -->
+  <section class="stats-banner">
+    <div class="stat-card">
+      <div class="stat-label">Total Decisions</div>
+      <div class="stat-value" id="stat-total-decisions">35</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Validated & Implemented</div>
+      <div class="stat-value" id="stat-validated">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Reversals & Superseded</div>
+      <div class="stat-value" id="stat-reversed">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Evidence Fidelity</div>
+      <div class="stat-value" id="stat-evidence">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Sessions</div>
+      <div class="stat-value" id="stat-sessions">16</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Accessible Sources</div>
+      <div class="stat-value" id="stat-sources">20</div>
+    </div>
+  </section>
+
+  <!-- Main View Container -->
+  <main class="main-content">
+
+    <!-- 1. Interactive Decision Graph View -->
+    <div class="view-pane active" id="view-graph">
+      <div class="graph-container">
+        <!-- Floating Graph Controls Toolbar -->
+        <div class="graph-controls-toolbar">
+          <button class="control-btn dimension-toggle" id="dimension-toggle" title="Toggle 2D / 3D Mode">🌐 3D</button>
+          <div class="toolbar-divider"></div>
+          <button class="control-btn" id="zoom-in-btn" title="Zoom In">+</button>
+          <button class="control-btn" id="zoom-out-btn" title="Zoom Out">−</button>
+          <button class="control-btn" id="zoom-reset-btn" title="Frame Entire Graph">⤢</button>
+          <button class="control-btn" id="focus-node-btn" title="Focus Selected Node">🎯</button>
+          <button class="control-btn" id="orbit-reset-btn" title="Reset Camera Orientation">↺</button>
+          <button class="control-btn" id="labels-toggle-btn" title="Toggle Node Labels">🏷️</button>
+          <button class="control-btn" id="layout-toggle" title="Toggle 2D Layout" style="display:none; width:auto; padding:0 6px; font-size:0.75rem;">⏱️ Chrono</button>
+        </div>
+
+        <!-- Floating Graph Viewing Modes Segmented Control -->
+        <div class="graph-modes-bar" id="graph-modes-bar">
+          <button class="mode-btn active" data-mode="all" title="View entire project decision landscape">🌌 Entire Graph</button>
+          <button class="mode-btn" data-mode="neighbourhood" title="Isolate selected decision and immediate dependencies">🔍 Focus Neighbourhood</button>
+          <button class="mode-btn" data-mode="trace" title="Trace upstream motivations and downstream consequences">⚡ Trace Decision History</button>
+        </div>
+
+        <!-- Floating Graph Filter Bar -->
+        <div class="graph-filters-bar">
+          <label style="font-size:0.78rem; font-weight:600; color:var(--text-secondary);">Category:</label>
+          <select class="filter-select" id="graph-category-filter">
+            <option value="all">All Categories</option>
+            <option value="architecture">Architecture</option>
+            <option value="product">Product</option>
+            <option value="infrastructure">Infrastructure</option>
+            <option value="security">Security</option>
+            <option value="ai">AI Pipeline</option>
+            <option value="ux">UX / Design</option>
+            <option value="operations">Operations</option>
+            <option value="automation">Automation</option>
+          </select>
+
+          <label style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-left:0.5rem;">Status:</label>
+          <select class="filter-select" id="graph-status-filter">
+            <option value="all">All Statuses</option>
+            <option value="validated">Validated</option>
+            <option value="implemented">Implemented</option>
+            <option value="reversed">Reversed</option>
+            <option value="superseded">Superseded</option>
+          </select>
+          <label style="font-size:0.78rem; font-weight:600; color:var(--text-secondary); margin-left:0.5rem;">Session:</label>
+          <select class="filter-select" id="graph-session-filter">
+            <option value="all">All Sessions (16)</option>
+          </select>
+        </div>
+
+        <!-- Dual Graph Canvas Wrapper (3D WebGL + 2D SVG) -->
+        <div class="graph-canvas-wrapper" id="graph-canvas-wrapper">
+          <canvas id="graph-canvas-3d"></canvas>
+          <svg id="graph-svg" style="display:none;"></svg>
+          <div class="billboard-labels-layer" id="billboard-labels-layer"></div>
+          <div class="orientation-gizmo-container" id="orientation-gizmo-container" title="3D Axis Gizmo (Red=Time/X, Green=Layer/Y, Blue=Depth/Z)">
+            <canvas id="gizmo-canvas" width="80" height="80"></canvas>
+            <div class="gizmo-legend">
+              <span style="color:#f85149;">X:Time</span>
+              <span style="color:#3fb950;">Y:Layer</span>
+              <span style="color:#58a6ff;">Z:Depth</span>
+            </div>
+          </div>
+          <div class="graph-3d-tooltip" id="graph-3d-tooltip"></div>
+        </div>
+
+        <!-- Graph Legend -->
+        <div class="graph-legend">
+          <div class="legend-header">
+            <span class="legend-title">Decision Knowledge Map</span>
+            <span class="mode-indicator-badge" id="graph-mode-badge">3D Space</span>
+          </div>
+          <div class="legend-items">
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#f2b705;"></span> Architecture</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#58a6ff;"></span> Product</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#39c5bb;"></span> Infra</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#f85149;"></span> Security</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#bc8cff;"></span> AI Pipeline</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#ec4899;"></span> UX</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#f97316;"></span> Operations</div>
+            <div class="legend-chip"><span class="legend-color-dot" style="background:#10b981;"></span> Automation</div>
+          </div>
+          <div class="legend-rels">
+            <span class="rel-indicator" style="color:var(--accent-green);">● Upstream</span>
+            <span class="rel-indicator" style="color:var(--accent-gold);">● Downstream</span>
+            <span class="rel-indicator" style="color:var(--accent-teal);">● Active Trace</span>
+          </div>
+          <div class="legend-hint">
+            <strong>Controls:</strong> Left-drag to orbit • Right-drag to pan • Scroll to zoom • Click node to inspect details.
+          </div>
+        </div>
+
+        <!-- Slide-out Detail Drawer -->
+        <aside class="detail-drawer" id="detail-drawer">
+          <div id="drawer-content">
+            <!-- Dynamically populated by app.js -->
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- 2. Chronological Timeline View -->
+    <div class="view-pane" id="view-timeline">
+      <div class="timeline-container">
+        <div class="timeline-header">
+          <h2>Project Evolutionary Timeline</h2>
+          <p>Chronological sequence tracing 12 distinct epochs from initial university fundraising to full enterprise SaaS productization.</p>
+          <div style="display:flex; justify-content:center; gap:0.75rem; margin-top:1rem;">
+            <button class="toggle-btn active" id="timeline-group-toggle" style="background:var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); padding:0.4rem 0.9rem; border-radius:var(--radius-full); font-size:0.82rem; font-weight:600; cursor:pointer;">👥 Group by Session</button>
+          </div>
+        </div>
+        <div class="timeline-track" id="timeline-track">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Decision Explorer View -->
+    <div class="view-pane" id="view-explorer">
+      <div class="explorer-container">
+        <div class="explorer-toolbar">
+          <div class="view-mode-toggle" id="explorer-view-toggle">
+            <button class="toggle-btn active" data-mode="decisions" id="explorer-toggle-decisions">Decisions (35)</button>
+            <button class="toggle-btn" data-mode="sessions" id="explorer-toggle-sessions">Sessions (16)</button>
+          </div>
+          <div class="search-input-wrapper">
+            <input type="text" class="search-input" id="search-input" placeholder="Search decisions, rationale, lessons, or code files...">
+          </div>
+          <div class="filter-group">
+            <select class="filter-select" id="category-filter">
+              <option value="all">Category: All</option>
+              <option value="architecture">Architecture</option>
+              <option value="product">Product</option>
+              <option value="infrastructure">Infrastructure</option>
+              <option value="security">Security</option>
+              <option value="ai">AI Pipeline</option>
+              <option value="ux">UX / Design</option>
+              <option value="operations">Operations</option>
+              <option value="automation">Automation</option>
+            </select>
+            <select class="filter-select" id="status-filter">
+              <option value="all">Status: All</option>
+              <option value="validated">Validated</option>
+              <option value="implemented">Implemented</option>
+              <option value="reversed">Reversed</option>
+              <option value="superseded">Superseded</option>
+            </select>
+            <select class="filter-select" id="significance-filter">
+              <option value="all">Significance: All</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select class="filter-select" id="evidence-filter">
+              <option value="all">Evidence: All</option>
+              <option value="documented">Documented</option>
+              <option value="corroborated">Corroborated</option>
+              <option value="inferred">Inferred</option>
+            </select>
+            <select class="filter-select" id="sort-filter">
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="sig">Significance</option>
+              <option value="title">Title (A-Z)</option>
+            </select>
+            <select class="filter-select" id="explorer-session-filter">
+              <option value="all">Session: All</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="explorer-cards">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Sources Inventory View -->
+    <div class="view-pane" id="view-sources">
+      <div class="sources-container">
+        <div style="margin-bottom:1.5rem;">
+          <h2 style="font-size:1.5rem; font-weight:800; margin-bottom:0.4rem;">Source Inventory & Provenance Registry</h2>
+          <p style="color:var(--text-secondary); font-size:0.9rem;">
+            Catalogue of all inspectable files, agent conversation transcripts, test suites, rules, and known historical gaps.
+          </p>
+        </div>
+        <table class="sources-table">
+          <thead>
+            <tr>
+              <th style="width:90px;">ID</th>
+              <th>Source Name & Description</th>
+              <th>Path / URI</th>
+              <th style="width:130px;">Type</th>
+              <th style="width:120px;">Accessibility</th>
+            </tr>
+          </thead>
+          <tbody id="sources-tbody">
+            <!-- Dynamically populated by app.js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
